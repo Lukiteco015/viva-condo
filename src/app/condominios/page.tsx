@@ -7,14 +7,32 @@ import { useEffect, useState } from "react"
 export default function ListaCondominios() {
 
 const [condominios, setCondominios] = useState<ICondominio[]>([])
+const [loading, setLoading] = useState(true)
+const [error, setError] = useState<string | null>(null)
+
 useEffect(()=>{
     const buscarCondominios = async () =>{
-        const data = await getCondominios()
-        console.log(data)
-        setCondominios(data)
+        try {
+            setLoading(true)
+            setError(null)
+            const data = await getCondominios()
+            setCondominios(data)
+        } catch (err: any) {
+            setError(err.message || "Erro ao buscar condomínios")
+        } finally {
+            setLoading(false)
+        }
     }
     buscarCondominios()
 }, [])
+
+    if(loading) {
+        return <div className="p-6">Carregando...</div>
+    }
+
+    if(error) {
+        return <div className="p-6 text-red-600">{error}</div>
+    }
 
     return (
         <div className="p-6 max-w-full">
