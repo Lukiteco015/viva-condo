@@ -40,7 +40,7 @@ export async function middleware(req: NextRequest) {
   // se não logado, redireciona para /
   if (!user) {
     console.log("🚫 Usuário não autenticado, redirecionando...");
-    const url = new URL("/", req.url);
+    const url = new URL("/login", req.url);
     url.searchParams.set("from", req.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
