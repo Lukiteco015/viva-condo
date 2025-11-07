@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/utils/supabase/client";
+import { supabase } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,8 +17,6 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const supabase = createClient();
-
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -29,9 +29,10 @@ export default function LoginPage() {
           setError("Erro inesperado. Tente novamente.");
         }
       } else {
-        window.location.href = "/condominios";
+        router.push("/condominios");
       }
     } catch (err) {
+      console.error(err);
       setError("Erro inesperado. Tente novamente.");
     } finally {
       setLoading(false);
@@ -73,7 +74,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !email || !password}
             className="w-full bg-gradient-to-r from-blue-500 to-green-500 text-white p-3 rounded-md font-semibold hover:opacity-90 transition-all disabled:opacity-50"
           >
             {loading ? "Entrando..." : "Entrar"}
