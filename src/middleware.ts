@@ -1,63 +1,160 @@
-import { createServerClient } from "@supabase/ssr";
-import { NextResponse, type NextRequest } from "next/server";
+// middleware.ts
 
+import { NextResponse, type NextRequest } from 'next/server';
 
-export async function middleware(req: NextRequest) {
-  console.log("🔥 Middleware executado em:", req.nextUrl.pathname);
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+ 
+export async function middleware(request: NextRequest) {
 
-  let res = NextResponse.next();
+  // 1. Cria uma resposta base que será usada e possivelmente modificada
 
-  // cria o client do Supabase no middleware
+  let response = NextResponse.next({
+
+    request: {
+
+      headers: request.headers,
+
+    },
+
+  });
+ 
+  // 2. Cria o cliente Supabase DENTRO do middleware (seu método)
+
   const supabase = createServerClient(
+
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
+
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+
     {
+
       cookies: {
-        getAll: () => {
-          console.log("📍 Cookies lidos:", req.cookies.getAll());
-          return req.cookies.getAll();
+
+        get(name: string) {
+
+          return request.cookies.get(name)?.value;
+
         },
-        setAll: (cookiesToSet) => {
-          console.log("📍 Cookies a serem setados:", cookiesToSet);
-          // atualiza cookies no request
-          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value));
-          // recria resposta com novos cookies
-          res = NextResponse.next();
-          cookiesToSet.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
-          );
+
+        set(name: string, value: string, options: CookieOptions) {
+
+          // O `createServerClient` precisa ser capaz de definir cookies na requisição e na resposta
+
+          request.cookies.set({ name, value, ...options });
+
+          response = NextResponse.next({
+
+            request: {
+
+              headers: request.headers,
+
+            },
+
+          });
+
+          response.cookies.set({ name, value, ...options });
+
         },
+
+        remove(name: string, options: CookieOptions) {
+
+          // O `createServerClient` precisa ser capaz de remover cookies na requisição e na resposta
+
+          request.cookies.set({ name, value: '', ...options });
+
+          response = NextResponse.next({
+
+            request: {
+
+              headers: request.headers,
+
+            },
+
+          });
+
+          response.cookies.set({ name, value: '', ...options });
+
+        },
+
       },
+
     }
+
   );
+ 
+  // 3. Busca a sessão do usuário (isso também atualiza o cookie se necessário)
 
-  console.log("🔎 Checando usuário autenticado...");
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
 
-  console.log("🔵 Usuário no middleware:", user);
-  console.log("🔵 Path acessado:", req.nextUrl.pathname);
+  const { pathname } = request.nextUrl;
+ 
+  // 4. LÓGICA DE REDIRECIONAMENTO (a parte mais importante)
 
-  // se não logado, redireciona para /
-  if (!user) {
-    console.log("🚫 Usuário não autenticado, redirecionando...");
-    const url = new URL("/login", req.url);
-    url.searchParams.set("from", req.nextUrl.pathname);
-    return NextResponse.redirect(url);
+  // ----------------------------------------------------------------
+
+  // Define as rotas públicas que não exigem login
+
+  // Usei '/' como sua página de login, ajuste se for '/login'
+
+  const publicRoutes = ['/'];
+ 
+  // CASO 1: Usuário está LOGADO e tenta acessar a página de login
+
+  if (session && publicRoutes.includes(pathname)) {
+
+    console.log("✅ Usuário logado tentando acessar rota pública. Redirecionando para /dashboard...");
+
+    // Altere '/dashboard' para a sua página principal após o login
+
+    return NextResponse.redirect(new URL('/condominios', request.url));
+
+  }
+ 
+  // CASO 2: Usuário NÃO está LOGADO e tenta acessar uma rota protegida
+
+  if (!session && !publicRoutes.includes(pathname)) {
+
+    console.log("🚫 Usuário deslogado tentando acessar rota protegida. Redirecionando para a página inicial...");
+
+    // Redireciona para a página de login
+
+    return NextResponse.redirect(new URL('/', request.url));
+
   }
 
-  console.log("✅ Usuário autenticado, acesso liberado!");
-  return res;
+  // Se nenhuma regra de redirecionamento for acionada, permite o acesso
+
+  console.log(`➡️ Acesso permitido para a rota: ${pathname}`);
+
+  return response;
+
 }
+ 
+// 5. CONFIGURAÇÃO DO MATCHER (igual a antes, para rodar em todas as rotas)
 
-// rotas protegidas
+// ----------------------------------------------------------------
+
 export const config = {
-  matcher: [
-    "/dashboard/:path*",
-    "/condominios/:path*",
-    "/usuarios/:path*",
-    "/moradores/:path*",
-    "/configuracoes/:path*"
-  ],
-};
 
-// documentação: https://supabase.com/docs/guides/auth/server-side/creating-a-client?queryGroups=environment&environment=middleware
+  matcher: [
+
+    /*
+
+     * Corresponde a todas as rotas, exceto as que começam com:
+
+     * - _next/static (arquivos estáticos)
+
+     * - _next/image (imagens otimizadas)
+
+     * - favicon.ico (ícone do site)
+
+     * - qualquer coisa com uma extensão de arquivo (e.g., .svg, .png)
+
+     */
+
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+
+  ],
+
+};
+ 

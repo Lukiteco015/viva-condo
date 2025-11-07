@@ -1,9 +1,11 @@
 "use client";
 import { getCondominios, ICondominio } from "@/service/condominio.service";
 import { useEffect, useState } from "react";
+import SearchBar from "@/components/barraPesquisa";
 
 export default function ListaCondominios() {
   const [condominios, setCondominios] = useState<ICondominio[]>([]);
+  const [filtro, setFiltro] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,6 +25,17 @@ export default function ListaCondominios() {
     buscarCondominios();
   }, []);
 
+  const condominiosFiltrados = condominios.filter((c) => {
+    const texto = filtro.toLowerCase();
+    return (
+      c.nome_condominio?.toLowerCase().includes(texto) ||
+      c.endereco_condominio?.toLowerCase().includes(texto) ||
+      c.cidade_condominio?.toLowerCase().includes(texto) ||
+      c.uf_condominio?.toLowerCase().includes(texto) ||
+      c.tipo_condominio?.toLowerCase().includes(texto)
+    );
+  });
+
   if (loading) return <div className="p-6">Carregando...</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
 
@@ -30,6 +43,12 @@ export default function ListaCondominios() {
     <div className="p-6 max-w-full">
       <h1 className="text-2xl font-bold mb-6 text-gray-800">Condomínios</h1>
 
+      {/* Barra de pesquisa*/}
+      <div className="mb-6">
+        <SearchBar value={filtro} onChange={setFiltro} />
+      </div>
+
+      {/*Tabela de condomínios */}
       <div className="overflow-x-auto bg-white rounded-lg shadow border border-gray-200">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -44,12 +63,15 @@ export default function ListaCondominios() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {condominios.length === 0 ? (
+            {/* Caso nao seja encontrado nada na pesquisa */}
+            {condominiosFiltrados.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-4 text-center text-gray-500">Nenhum condomínio encontrado</td>
+                <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                  Nenhum condomínio encontrado
+                </td>
               </tr>
             ) : (
-              condominios.map((c, i) => (
+              condominiosFiltrados.map((c, i) => (
                 <tr key={c.id_condominio} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{i + 1}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{c.nome_condominio}</td>

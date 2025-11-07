@@ -4,9 +4,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { GiFamilyHouse } from "react-icons/gi";
 import { LuBuilding2, LuLogOut, LuMenu, LuChevronLeft, LuChevronRight } from "react-icons/lu";
 import { FaHouseUser } from "react-icons/fa";
+import { LiaCitySolid } from "react-icons/lia";
+import { RxExit } from "react-icons/rx";
+import { TbLayoutDashboard } from "react-icons/tb";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,7 +51,7 @@ export default function Menu() {
           .replace(/^ +/, "")
           .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
       });
-      router.push("/login");
+      router.push("/");
     } catch (error) {
       console.error("Erro ao sair:", error);
     } finally {
@@ -67,8 +69,8 @@ export default function Menu() {
   const closeMobileSidebar = () => isMobile && setIsMobileOpen(false);
 
   const links = [
-    { href: "/dashboard", label: "Dashboard", icon: <GiFamilyHouse size={22} /> },
-    { href: "/condominios", label: "Condomínios", icon: <LuBuilding2 size={22} /> },
+    { href: "/dashboard", label: "Dashboard", icon: <TbLayoutDashboard size={25}/> },
+    { href: "/condominios/novo", label: "Condomínios", icon: <LuBuilding2 size={22} /> },
     { href: "/usuarios", label: "Usuários", icon: <FaHouseUser size={22} /> },
   ];
 
@@ -102,8 +104,8 @@ export default function Menu() {
         {/* Header */}
         <div className="relative flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700 min-h-[73px]">
           <div className={`flex items-center gap-3 transition-all duration-300 ${collapsed && !isMobile ? "opacity-0 w-0 overflow-hidden" : "opacity-100"}`}>
-            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
-              <GiFamilyHouse size={24} className="text-blue-600" />
+            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <LiaCitySolid size={50} className="text-white"/>
             </div>
             <span className="text-xl font-bold text-white whitespace-nowrap">Viva Condo</span>
           </div>
@@ -150,7 +152,7 @@ export default function Menu() {
             disabled={loading}
             className={`group relative w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-200 ${collapsed && !isMobile ? "justify-center" : ""}`}
           >
-            <LuLogOut size={22} className="flex-shrink-0" />
+            <RxExit size={22} className="flex-shrink-0" />
             <span className="font-medium">{loading ? "Saindo..." : "Sair"}</span>
           </button>
         </div>
