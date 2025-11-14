@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,22 +8,34 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import ConfirmDialog from "./confirmDialog";
-import EditDialog from "./editLog";
-import { ICondominio } from "@/service/condominio.service";
 
-interface DropdownActionsProps {
-  condominio: ICondominio;
-  onDelete: () => void;
-  onUpdate: (id: number, novosDados: Partial<ICondominio>) => void;
+interface EditDialogInjectedProps {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}
+
+interface ActionDropdownProps {
+  itemName: string;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  editDialog?: React.ReactElement<EditDialogInjectedProps> | null;
 }
 
 export default function DropdownActions({
-  condominio,
+  itemName,
+  onEdit,
   onDelete,
-  onUpdate,
-}: DropdownActionsProps) {
+  editDialog = null,
+}: ActionDropdownProps) {
   const [openConfirm, setOpenConfirm] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
+
+  const dialogClonado = editDialog
+    ? React.cloneElement(editDialog, {
+        open: openEdit,
+        onOpenChange: setOpenEdit,
+      })
+    : null;
 
   return (
     <>
@@ -31,39 +43,44 @@ export default function DropdownActions({
         <DropdownMenuTrigger asChild>
           <button
             className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-            aria-label="Ações do condomínio"
+            aria-label="Ações"
           >
             <MoreVertical className="w-5 h-5 text-gray-600" />
           </button>
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align="end" className="w-36">
-          <DropdownMenuItem onClick={() => setOpenEdit(true)}>
-            <Pencil className="mr-2 h-4 w-4 text-blue-600" /> Editar
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => setOpenConfirm(true)}
-            className="text-red-600"
-          >
-            <Trash2 className="mr-2 h-4 w-4" /> Excluir
-          </DropdownMenuItem>
+          {onEdit && (
+            <DropdownMenuItem
+              onClick={() => {
+                onEdit();
+                setOpenEdit(true);
+              }}
+            >
+              <Pencil className="mr-2 h-4 w-4 text-blue-600" /> Editar
+            </DropdownMenuItem>
+          )}
+
+          {onDelete && (
+            <DropdownMenuItem
+              onClick={() => setOpenConfirm(true)}
+              className="text-red-600"
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Excluir
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <EditDialog
-        open={openEdit}
-        onOpenChange={setOpenEdit}
-        condominio={condominio}
-        onUpdate={onUpdate}
-      />
+      {dialogClonado}
 
       <ConfirmDialog
         open={openConfirm}
         onOpenChange={setOpenConfirm}
-        title="Excluir condomínio"
-        description={`Tem certeza de que deseja excluir o condomínio "${condominio.nome_condominio}"? Essa ação não poderá ser desfeita.`}
-        onConfirm={onDelete}
+        title={`Excluir ${itemName}`}
+        description={`Tem certeza que deseja excluir "${itemName}"? Essa ação não poderá ser desfeita.`}
         confirmLabel="Excluir"
+        onConfirm={onDelete ?? (() => {})}
       />
     </>
   );

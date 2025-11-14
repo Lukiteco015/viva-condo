@@ -2,8 +2,16 @@
 import { useEffect, useState } from "react";
 import SearchBar from "@/components/barraPesquisa";
 import DropdownActions from "@/components/dropdownActions";
+import EditDialogBase from "@/components/editLog";
 import { showToast } from "@/components/toastNotification";
-import { getCondominios, deleteCondominio, ICondominio } from "@/service/condominio.service";
+import {
+  getCondominios,
+  updateCondominio,
+  deleteCondominio,
+  ICondominio,
+} from "@/service/condominio.service";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function ListaCondominios() {
   const [condominios, setCondominios] = useState<ICondominio[]>([]);
@@ -11,13 +19,20 @@ export default function ListaCondominios() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Estado do dialog de edição
+  const [editOpen, setEditOpen] = useState(false);
+  const [condominioSelecionado, setCondominioSelecionado] =
+    useState<ICondominio | null>(null);
+
   const buscarCondominios = async () => {
     try {
       setLoading(true);
       const data = await getCondominios();
       setCondominios(data);
+      setError(null);
     } catch (err: any) {
       setError(err.message || "Erro ao buscar condomínios.");
+      showToast.error("Erro ao carregar condomínios");
     } finally {
       setLoading(false);
     }
@@ -32,15 +47,45 @@ export default function ListaCondominios() {
       await deleteCondominio(id);
       setCondominios((prev) => prev.filter((c) => c.id !== id));
       showToast.success("Condomínio excluído com sucesso!");
-    } catch {
-      showToast.error("Erro ao excluir condomínio.");
+    } catch (err: any) {
+      showToast.error(err.message || "Erro ao excluir condomínio");
     }
   };
 
-  const handleUpdate = (id: number, novosDados: Partial<ICondominio>) => {
+  const handleUpdate = async (dados: ICondominio) => {
+  try {
+    const updated = await updateCondominio(dados); // ✅ Passa só dados
+    
     setCondominios((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...novosDados } : c))
+      prev.map((c) => (c.id === updated.id ? updated : c))
     );
+    
+    showToast.success("Condomínio atualizado com sucesso!");
+  } catch (err: any) {
+    showToast.error(err.message || "Erro ao atualizar condomínio");
+    throw err;
+  }
+};
+
+  const abrirEdicao = (condominio: ICondominio) => {
+    setCondominioSelecionado(condominio);
+    setEditOpen(true);
+  };
+
+  const validarCondominio = (data: ICondominio): string | null => {
+    if (!data.nome_condominio?.trim()) {
+      return "Nome do condomínio é obrigatório";
+    }
+    if (!data.cidade_condominio?.trim()) {
+      return "Cidade é obrigatória";
+    }
+    if (!data.uf_condominio?.trim()) {
+      return "UF é obrigatória";
+    }
+    if (data.uf_condominio.length !== 2) {
+      return "UF deve ter 2 caracteres";
+    }
+    return null;
   };
 
   const condominiosFiltrados = condominios.filter((c) => {
@@ -54,12 +99,34 @@ export default function ListaCondominios() {
     );
   });
 
-  if (loading) return <div className="p-6">Carregando...</div>;
-  if (error) return <div className="p-6 text-red-600">{error}</div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-600">Carregando...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-600">{error}</p>
+          <button
+            onClick={buscarCondominios}
+            className="mt-2 text-sm text-red-700 underline"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-full">
       <h1 className="text-2xl font-bold mb-6 text-gray-800">Condomínios</h1>
+
       <div className="mb-6">
         <SearchBar value={filtro} onChange={setFiltro} />
       </div>
@@ -68,36 +135,65 @@ export default function ListaCondominios() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Endereço</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cidade</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">UF</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ação</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                #
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Nome
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Endereço
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Cidade
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                UF
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Tipo
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Ações
+              </th>
             </tr>
           </thead>
+
           <tbody className="bg-white divide-y divide-gray-200">
             {condominiosFiltrados.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
-                  Nenhum condomínio encontrado.
+                <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  {filtro
+                    ? "Nenhum condomínio encontrado com esse filtro"
+                    : "Nenhum condomínio cadastrado"}
                 </td>
               </tr>
             ) : (
               condominiosFiltrados.map((c, i) => (
-                <tr key={c.id} className="hover:bg-gray-50 transition">
-                  <td className="px-6 py-4 text-sm text-gray-600">{i + 1}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{c.nome_condominio}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{c.endereco_condominio}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{c.cidade_condominio}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{c.uf_condominio}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{c.tipo_condominio}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">
+                <tr key={c.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {i + 1}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {c.nome_condominio}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {c.endereco_condominio || "-"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {c.cidade_condominio}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {c.uf_condominio}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {c.tipo_condominio || "-"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <DropdownActions
-                      condominio={c}
+                      itemName={c.nome_condominio ?? "Item"}
+                      onEdit={() => abrirEdicao(c)}
                       onDelete={() => handleDelete(c.id)}
-                      onUpdate={handleUpdate}
                     />
                   </td>
                 </tr>
@@ -106,6 +202,104 @@ export default function ListaCondominios() {
           </tbody>
         </table>
       </div>
+
+      {/* Dialog de edição - FORA do map, renderizado UMA VEZ */}
+      {condominioSelecionado && (
+        <EditDialogBase
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          title="Editar Condomínio"
+          initialData={condominioSelecionado}
+          onSave={handleUpdate}
+          validate={validarCondominio}
+          requireConfirmation={true}
+        >
+          {(data, setData) => (
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <Label htmlFor="nome" className="text-sm font-medium">
+                  Nome do Condomínio *
+                </Label>
+                <Input
+                  id="nome"
+                  value={data.nome_condominio || ""}
+                  onChange={(e) =>
+                    setData({ ...data, nome_condominio: e.target.value })
+                  }
+                  placeholder="Digite o nome"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="endereco" className="text-sm font-medium">
+                  Endereço
+                </Label>
+                <Input
+                  id="endereco"
+                  value={data.endereco_condominio || ""}
+                  onChange={(e) =>
+                    setData({ ...data, endereco_condominio: e.target.value })
+                  }
+                  placeholder="Digite o endereço"
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="cidade" className="text-sm font-medium">
+                    Cidade *
+                  </Label>
+                  <Input
+                    id="cidade"
+                    value={data.cidade_condominio || ""}
+                    onChange={(e) =>
+                      setData({ ...data, cidade_condominio: e.target.value })
+                    }
+                    placeholder="Cidade"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="uf" className="text-sm font-medium">
+                    UF *
+                  </Label>
+                  <Input
+                    id="uf"
+                    value={data.uf_condominio || ""}
+                    onChange={(e) =>
+                      setData({
+                        ...data,
+                        uf_condominio: e.target.value.toUpperCase(),
+                      })
+                    }
+                    placeholder="SP"
+                    maxLength={2}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="tipo" className="text-sm font-medium">
+                  Tipo
+                </Label>
+                <Input
+                  id="tipo"
+                  value={data.tipo_condominio || ""}
+                  onChange={(e) =>
+                    setData({ ...data, tipo_condominio: e.target.value })
+                  }
+                  placeholder="Residencial, Comercial, etc."
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          )}
+        </EditDialogBase>
+      )}
     </div>
   );
 }

@@ -1,84 +1,133 @@
 "use client";
-import * as React from "react";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { updateCondominio, ICondominio } from "@/service/condominio.service";
-import { showToast } from "@/components/toastNotification";
+import ConfirmDialog from "./confirmDialog";
 
-interface EditDialogProps {
+interface EditDialogBaseProps<T> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  condominio: ICondominio;
-  onUpdate: (id: number, novosDados: Partial<ICondominio>) => void;
+  title?: string;
+  initialData: T;
+  onSave: (data: T) => void | Promise<void>;
+  validate?: (data: T) => string | null; // retorna mensagem de erro ou null
+  requireConfirmation?: boolean; // controla se precisa de confirmação
+  children: (data: T, setData: (data: T) => void) => React.ReactNode;
 }
 
-export default function EditDialog({
+export default function EditDialogBase<T>({
   open,
   onOpenChange,
-  condominio,
-  onUpdate,
-}: EditDialogProps) {
-  const [formData, setFormData] = React.useState(condominio);
-  const [saving, setSaving] = React.useState(false);
+  title = "Editar",
+  initialData,
+  onSave,
+  validate,
+  requireConfirmation = false,
+  children,
+}: EditDialogBaseProps<T>) {
+  // Estado local - cópia dos dados para edição
+  const [data, setData] = useState<T>(initialData);
+  const [openConfirmSave, setOpenConfirmSave] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
+  // Reseta o estado quando o dialog abre/fecha
   React.useEffect(() => {
-    setFormData(condominio);
-  }, [condominio]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+    if (open) {
+      setData(initialData);
+      setError(null);
+    }
+  }, [open, initialData]);
 
   const handleSave = async () => {
-    setSaving(true);
-    try {
-      const atualizado = await updateCondominio(condominio.id, formData);
-      if (atualizado) {
-        onUpdate(condominio.id, formData);
-        showToast.success("Condomínio atualizado com sucesso!");
+    // Validação
+    if (validate) {
+      const validationError = validate(data);
+      if (validationError) {
+        setError(validationError);
+        return;
       }
+    }
+
+    setError(null);
+    setIsSaving(true);
+
+    try {
+      await onSave(data);
       onOpenChange(false);
-    } catch {
-      showToast.error("Erro ao atualizar condomínio. Tente novamente.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar");
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
+  const handleSaveClick = () => {
+    if (requireConfirmation) {
+      setOpenConfirmSave(true);
+    } else {
+      handleSave();
+    }
+  };
+
+  const handleConfirmSave = () => {
+    setOpenConfirmSave(false);
+    handleSave();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Editar Condomínio</DialogTitle>
-          <DialogDescription>Atualize as informações abaixo:</DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+          </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-3 mt-2">
-          <Input name="nome_condominio" value={formData.nome_condominio} onChange={handleChange} placeholder="Nome" />
-          <Input name="tipo_condominio" value={formData.tipo_condominio} onChange={handleChange} placeholder="Tipo" />
-          <Input name="endereco_condominio" value={formData.endereco_condominio} onChange={handleChange} placeholder="Endereço" />
-          <Input name="cidade_condominio" value={formData.cidade_condominio} onChange={handleChange} placeholder="Cidade" />
-          <Input name="uf_condominio" value={formData.uf_condominio} onChange={handleChange} placeholder="UF" maxLength={2} />
-        </div>
+          <div className="py-4">
+            {children(data, setData)}
+            
+            {error && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+          </div>
 
-        <DialogFooter className="flex justify-end space-x-2 mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Salvando..." : "Salvar alterações"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              disabled={isSaving}
+            >
+              Cancelar
+            </Button>
+
+            <Button 
+              onClick={handleSaveClick}
+              disabled={isSaving}
+            >
+              {isSaving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {requireConfirmation && (
+        <ConfirmDialog
+          open={openConfirmSave}
+          onOpenChange={setOpenConfirmSave}
+          title="Confirmar alterações"
+          description="Deseja realmente salvar as alterações?"
+          confirmLabel="Salvar"
+          onConfirm={handleConfirmSave}
+        />
+      )}
+    </>
   );
 }
