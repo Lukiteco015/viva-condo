@@ -1,3 +1,4 @@
+//edit log genérico com confirmação opcional
 "use client";
 import React, { useState } from "react";
 import {

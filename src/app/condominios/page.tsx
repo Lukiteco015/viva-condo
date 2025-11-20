@@ -1,3 +1,4 @@
+//page condominios
 "use client";
 import { useEffect, useState } from "react";
 import SearchBar from "@/components/barraPesquisa";
@@ -8,10 +9,13 @@ import {
   getCondominios,
   updateCondominio,
   deleteCondominio,
+  createCondominio,
   ICondominio,
 } from "@/service/condominio.service";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import CreateCondominioDialog from "@/components/condominio/createCondominioDialog";
 
 export default function ListaCondominios() {
   const [condominios, setCondominios] = useState<ICondominio[]>([]);
@@ -23,8 +27,10 @@ export default function ListaCondominios() {
   const [editOpen, setEditOpen] = useState(false);
   const [condominioSelecionado, setCondominioSelecionado] =
     useState<ICondominio | null>(null);
+  
+  const [createOpen, setCreateOpen] = useState(false);
 
-  const buscarCondominios = async () => {
+    const buscarCondominios = async () => {
     try {
       setLoading(true);
       const data = await getCondominios();
@@ -41,6 +47,17 @@ export default function ListaCondominios() {
   useEffect(() => {
     buscarCondominios();
   }, []);
+
+  const handleCreate = async (data: Omit<ICondominio, "id">) => {
+  try {
+    const novo = await createCondominio(data); 
+    setCondominios((prev) => [...prev, novo]);
+    showToast.success("Condomínio criado com sucesso!");
+  } catch (err: any) {
+    showToast.error(err.message || "Erro ao criar condomínio");
+    throw err;
+  }
+};
 
   const handleDelete = async (id: number) => {
     try {
@@ -72,21 +89,13 @@ export default function ListaCondominios() {
     setEditOpen(true);
   };
 
-  const validarCondominio = (data: ICondominio): string | null => {
-    if (!data.nome_condominio?.trim()) {
-      return "Nome do condomínio é obrigatório";
-    }
-    if (!data.cidade_condominio?.trim()) {
-      return "Cidade é obrigatória";
-    }
-    if (!data.uf_condominio?.trim()) {
-      return "UF é obrigatória";
-    }
-    if (data.uf_condominio.length !== 2) {
-      return "UF deve ter 2 caracteres";
-    }
-    return null;
-  };
+  const validarCondominio = (data: any): string | null => {
+  if (!data.nome_condominio?.trim()) return "Nome do condomínio é obrigatório";
+  if (!data.cidade_condominio?.trim()) return "Cidade é obrigatória";
+  if (!data.uf_condominio?.trim()) return "UF é obrigatória";
+  if (data.uf_condominio.length !== 2) return "UF deve ter 2 caracteres";
+  return null;
+};
 
   const condominiosFiltrados = condominios.filter((c) => {
     const texto = filtro.toLowerCase();
@@ -127,8 +136,12 @@ export default function ListaCondominios() {
     <div className="p-6 max-w-full">
       <h1 className="text-2xl font-bold mb-6 text-gray-800">Condomínios</h1>
 
-      <div className="mb-6">
+      <div className="flex justify-between mb-6">
         <SearchBar value={filtro} onChange={setFiltro} />
+
+        <Button onClick={() => setCreateOpen(true)}>
+          + Adicionar Condomínio
+        </Button>
       </div>
 
       <div className="overflow-x-auto bg-white rounded-lg shadow border border-gray-200">
@@ -298,8 +311,15 @@ export default function ListaCondominios() {
               </div>
             </div>
           )}
+          
         </EditDialogBase>
       )}
+      <CreateCondominioDialog
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            onSave={handleCreate} //não consegui consertar esse erro mas esta funcionando
+            validate={validarCondominio}
+          />
     </div>
   );
 }
