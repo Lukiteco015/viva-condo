@@ -1,8 +1,7 @@
 import { supabase } from "@/utils/supabase/client";
 
-// ============================================================================
-// TYPES & INTERFACES
-// ============================================================================
+const TABLE_NAME = "condominio";
+
 
 export interface ICondominio {
   id: number;
@@ -15,25 +14,12 @@ export interface ICondominio {
   updated_at?: string;
 }
 
-export interface ICondominioCreate {
-  nome_condominio: string;
-  endereco_condominio?: string | null;
-  cidade_condominio: string;
-  uf_condominio: string;
-  tipo_condominio?: string | null;
-}
 
-export interface ICondominioUpdate {
-  nome_condominio?: string;
-  endereco_condominio?: string | null;
-  cidade_condominio?: string;
-  uf_condominio?: string;
-  tipo_condominio?: string | null;
-}
+export type ICondominioCreate = Omit<ICondominio, "id" | "created_at" | "updated_at">;
 
-// ============================================================================
-// ERROR HANDLING
-// ============================================================================
+
+export type ICondominioUpdate = Partial<ICondominioCreate>;
+
 
 export class CondominioError extends Error {
   constructor(
@@ -46,75 +32,81 @@ export class CondominioError extends Error {
   }
 }
 
+
 function handleSupabaseError(error: any, operation: string): never {
   console.error(`[Condominio Service] ${operation} error:`, error);
 
-  if (error.code === "PGRST116") {
-    throw new CondominioError(
-      "Condomínio não encontrado",
-      "NOT_FOUND",
-      error
-    );
-  }
+  const errorMap: Record<string, { msg: string; code: string }> = {
+    "PGRST116": { msg: "Condomínio não encontrado", code: "NOT_FOUND" },
+    "23505": { msg: "Já existe um condomínio com esses dados", code: "DUPLICATE" },
+    "23503": { msg: "Não é possível excluir: existem registros relacionados", code: "FOREIGN_KEY_VIOLATION" }
+  };
 
-  if (error.code === "23505") {
-    throw new CondominioError(
-      "Já existe um condomínio com esses dados",
-      "DUPLICATE",
-      error
-    );
-  }
+  const mappedError = errorMap[error.code];
 
-  if (error.code === "23503") {
-    throw new CondominioError(
-      "Não é possível excluir: existem registros relacionados",
-      "FOREIGN_KEY_VIOLATION",
-      error
-    );
+  if (mappedError) {
+    throw new CondominioError(mappedError.msg, mappedError.code, error);
   }
 
   throw new CondominioError(
     error.message || `Erro ao ${operation}`,
-    error.code,
+    error.code || "UNKNOWN",
     error
   );
 }
 
-// ============================================================================
-// CRUD OPERATIONS
-// ============================================================================
+function sanitizarDados<T extends Partial<ICondominioCreate>>(dados: T): T {
+  const sanitizado = { ...dados };
+
+  if (sanitizado.nome_condominio) sanitizado.nome_condominio = sanitizado.nome_condominio.trim();
+  if (sanitizado.endereco_condominio) sanitizado.endereco_condominio = sanitizado.endereco_condominio.trim();
+  if (sanitizado.cidade_condominio) sanitizado.cidade_condominio = sanitizado.cidade_condominio.trim();
+  if (sanitizado.uf_condominio) sanitizado.uf_condominio = sanitizado.uf_condominio.trim().toUpperCase();
+  if (sanitizado.tipo_condominio) sanitizado.tipo_condominio = sanitizado.tipo_condominio.trim();
+
+  return sanitizado;
+}
+
+
+function validarPayload(dados: Partial<ICondominioCreate>, isUpdate: boolean = false) {
+  if (!isUpdate) {
+    if (!dados.nome_condominio) throw new CondominioError("Nome do condomínio é obrigatório", "VALIDATION_ERROR");
+    if (!dados.cidade_condominio) throw new CondominioError("Cidade é obrigatória", "VALIDATION_ERROR");
+    if (!dados.uf_condominio) throw new CondominioError("UF é obrigatória", "VALIDATION_ERROR");
+  }
+
+  if (dados.uf_condominio && dados.uf_condominio.length !== 2) {
+    throw new CondominioError("UF deve ter exatamente 2 caracteres", "VALIDATION_ERROR");
+  }
+}
 
 export async function getCondominios(): Promise<ICondominio[]> {
   try {
     const { data, error } = await supabase
-      .from("condominio")
+      .from(TABLE_NAME)
       .select("*")
       .order("id", { ascending: true });
 
     if (error) handleSupabaseError(error, "buscar condomínios");
-
     return data ?? [];
   } catch (error) {
     if (error instanceof CondominioError) throw error;
-    throw new CondominioError("Erro inesperado ao buscar condomínios");
+    throw new CondominioError("Erro inesperado ao buscar lista de condomínios");
   }
 }
 
-export async function getCondominioById(
-  id: number
-): Promise<ICondominio | null> {
+export async function getCondominioById(id: number): Promise<ICondominio | null> {
   try {
     const { data, error } = await supabase
-      .from("condominio")
+      .from(TABLE_NAME)
       .select("*")
       .eq("id", id)
       .single();
 
     if (error) {
       if (error.code === "PGRST116") return null;
-      handleSupabaseError(error, "buscar condomínio");
+      handleSupabaseError(error, "buscar condomínio por ID");
     }
-
     return data;
   } catch (error) {
     if (error instanceof CondominioError) throw error;
@@ -122,42 +114,22 @@ export async function getCondominioById(
   }
 }
 
-export async function createCondominio(
-  dados: ICondominioCreate
-): Promise<ICondominio> {
+/**
+ * Cria um novo condomínio
+ */
+export async function createCondominio(dados: ICondominioCreate): Promise<ICondominio> {
   try {
-    if (!dados.nome_condominio?.trim()) {
-      throw new CondominioError(
-        "Nome do condomínio é obrigatório",
-        "VALIDATION_ERROR"
-      );
-    }
-
-    if (!dados.cidade_condominio?.trim()) {
-      throw new CondominioError("Cidade é obrigatória", "VALIDATION_ERROR");
-    }
-
-    if (!dados.uf_condominio?.trim() || dados.uf_condominio.length !== 2) {
-      throw new CondominioError(
-        "UF deve ter exatamente 2 caracteres",
-        "VALIDATION_ERROR"
-      );
-    }
+    const dadosLimpos = sanitizarDados(dados);
+    validarPayload(dadosLimpos, false);
 
     const { data, error } = await supabase
-      .from("condominio")
-      .insert({
-        nome_condominio: dados.nome_condominio.trim(),
-        endereco_condominio: dados.endereco_condominio?.trim() || null,
-        cidade_condominio: dados.cidade_condominio.trim(),
-        uf_condominio: dados.uf_condominio.trim().toUpperCase(),
-        tipo_condominio: dados.tipo_condominio?.trim() || null,
-      })
+      .from(TABLE_NAME)
+      .insert(dadosLimpos)
       .select()
       .single();
 
     if (error) handleSupabaseError(error, "criar condomínio");
-    if (!data) throw new CondominioError("Erro ao criar condomínio");
+    if (!data) throw new CondominioError("Erro ao retornar dados do condomínio criado");
 
     return data;
   } catch (error) {
@@ -167,37 +139,28 @@ export async function createCondominio(
 }
 
 /**
- * Atualiza um condomínio existente
- * @param dados - Objeto completo do condomínio com o ID
+ * Atualiza um condomínio existente.
+ * Aceita partial update (envie apenas o que mudou).
  */
-export async function updateCondominio(
-  dados: ICondominio
-): Promise<ICondominio> {
+export async function updateCondominio(id: number, dados: ICondominioUpdate): Promise<ICondominio> {
   try {
-    if (!dados.id) {
-      throw new CondominioError("ID é obrigatório", "VALIDATION_ERROR");
-    }
+    if (!id) throw new CondominioError("ID é obrigatório para atualização", "VALIDATION_ERROR");
 
-    const exists = await getCondominioById(dados.id);
-    if (!exists) {
-      throw new CondominioError("Condomínio não encontrado", "NOT_FOUND");
-    }
+    // Sanitiza apenas os campos enviados
+    const dadosLimpos = sanitizarDados(dados);
+    validarPayload(dadosLimpos, true);
 
+    // Dica: Em sistemas de alta performance, removemos o "getById" antes do update para economizar request,
+    // confiando que o update retornará erro se o ID não existir ou se retornar null.
     const { data, error } = await supabase
-      .from("condominio")
-      .update({
-        nome_condominio: dados.nome_condominio?.trim(),
-        endereco_condominio: dados.endereco_condominio?.trim() || null,
-        cidade_condominio: dados.cidade_condominio?.trim(),
-        uf_condominio: dados.uf_condominio?.trim().toUpperCase(),
-        tipo_condominio: dados.tipo_condominio?.trim() || null
-      })
-      .eq("id", dados.id)
+      .from(TABLE_NAME)
+      .update(dadosLimpos)
+      .eq("id", id)
       .select()
       .single();
 
     if (error) handleSupabaseError(error, "atualizar condomínio");
-    if (!data) throw new CondominioError("Erro ao atualizar condomínio");
+    if (!data) throw new CondominioError("Condomínio não encontrado para atualização", "NOT_FOUND");
 
     return data;
   } catch (error) {
@@ -206,21 +169,14 @@ export async function updateCondominio(
   }
 }
 
-/**
- * Deleta um condomínio
- */
 export async function deleteCondominio(id: number): Promise<void> {
   try {
-    if (!id) {
-      throw new CondominioError("ID é obrigatório", "VALIDATION_ERROR");
-    }
+    if (!id) throw new CondominioError("ID inválido", "VALIDATION_ERROR");
 
-    const exists = await getCondominioById(id);
-    if (!exists) {
-      throw new CondominioError("Condomínio não encontrado", "NOT_FOUND");
-    }
-
-    const { error } = await supabase.from("condominio").delete().eq("id", id);
+    const { error } = await supabase
+      .from(TABLE_NAME)
+      .delete()
+      .eq("id", id);
 
     if (error) handleSupabaseError(error, "excluir condomínio");
   } catch (error) {
@@ -229,44 +185,29 @@ export async function deleteCondominio(id: number): Promise<void> {
   }
 }
 
-// ============================================================================
-// QUERY HELPERS
-// ============================================================================
 
-export async function getCondominiosByCidade(
-  cidade: string
+export async function getCondominiosByFiltro(
+  campo: "cidade_condominio" | "uf_condominio", 
+  valor: string
 ): Promise<ICondominio[]> {
   try {
-    const { data, error } = await supabase
-      .from("condominio")
+    let query = supabase
+      .from(TABLE_NAME)
       .select("*")
-      .ilike("cidade_condominio", `%${cidade}%`)
       .order("nome_condominio", { ascending: true });
 
-    if (error) handleSupabaseError(error, "buscar condomínios por cidade");
+    if (campo === "cidade_condominio") {
+      query = query.ilike(campo, `%${valor}%`);
+    } else {
+      query = query.eq(campo, valor.toUpperCase());
+    }
 
+    const { data, error } = await query;
+
+    if (error) handleSupabaseError(error, `buscar condomínios por ${campo}`);
     return data ?? [];
   } catch (error) {
     if (error instanceof CondominioError) throw error;
-    throw new CondominioError(
-      "Erro inesperado ao buscar condomínios por cidade"
-    );
-  }
-}
-
-export async function getCondominiosByUF(uf: string): Promise<ICondominio[]> {
-  try {
-    const { data, error } = await supabase
-      .from("condominio")
-      .select("*")
-      .eq("uf_condominio", uf.toUpperCase())
-      .order("nome_condominio", { ascending: true });
-
-    if (error) handleSupabaseError(error, "buscar condomínios por UF");
-
-    return data ?? [];
-  } catch (error) {
-    if (error instanceof CondominioError) throw error;
-    throw new CondominioError("Erro inesperado ao buscar condomínios por UF");
+    throw new CondominioError(`Erro ao filtrar condomínios por ${campo}`);
   }
 }

@@ -16,8 +16,8 @@ interface EditDialogBaseProps<T> {
   title?: string;
   initialData: T;
   onSave: (data: T) => void | Promise<void>;
-  validate?: (data: T) => string | null; // retorna mensagem de erro ou null
-  requireConfirmation?: boolean; // controla se precisa de confirmação
+  validate?: (data: T) => string | null;
+  requireConfirmation?: boolean;
   children: (data: T, setData: (data: T) => void) => React.ReactNode;
 }
 

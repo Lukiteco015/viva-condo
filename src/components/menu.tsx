@@ -69,7 +69,6 @@ export default function Menu() {
   const closeMobileSidebar = () => isMobile && setIsMobileOpen(false);
 
   const links = [
-    { href: "/dashboard", label: "Dashboard", icon: <TbLayoutDashboard size={25}/> },
     { href: "/condominios", label: "Condomínios", icon: <LuBuilding2 size={22} /> },
     { href: "/usuarios", label: "Usuários", icon: <FaHouseUser size={22} /> },
   ];

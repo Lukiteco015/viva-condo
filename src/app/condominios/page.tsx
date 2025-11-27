@@ -6,12 +6,16 @@ import EditDialogBase from "@/components/editLog";
 import { showToast } from "@/components/toastNotification";
 import {
   getCondominios,
+  createCondominio,
   updateCondominio,
   deleteCondominio,
   ICondominio,
+  ICondominioCreate,
 } from "@/service/condominio.service";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 
 export default function ListaCondominios() {
   const [condominios, setCondominios] = useState<ICondominio[]>([]);
@@ -19,8 +23,9 @@ export default function ListaCondominios() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Estado do dialog de edição
-  const [editOpen, setEditOpen] = useState(false);
+  // Estado do dialog (único para criar E editar)
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [modoEdicao, setModoEdicao] = useState(false);
   const [condominioSelecionado, setCondominioSelecionado] =
     useState<ICondominio | null>(null);
 
@@ -52,24 +57,48 @@ export default function ListaCondominios() {
     }
   };
 
+  const handleCreate = async (dados: ICondominio) => {
+    try {
+      const { id, created_at, updated_at, ...dadosCreate } = dados;
+      const novo = await createCondominio(dadosCreate as ICondominioCreate);
+      setCondominios((prev) => [...prev, novo]);
+      showToast.success("Condomínio criado com sucesso!");
+    } catch (err: any) {
+      showToast.error(err.message || "Erro ao criar condomínio");
+      throw err;
+    }
+  };
+
   const handleUpdate = async (dados: ICondominio) => {
-  try {
-    const updated = await updateCondominio(dados); // ✅ Passa só dados
-    
-    setCondominios((prev) =>
-      prev.map((c) => (c.id === updated.id ? updated : c))
-    );
-    
-    showToast.success("Condomínio atualizado com sucesso!");
-  } catch (err: any) {
-    showToast.error(err.message || "Erro ao atualizar condomínio");
-    throw err;
-  }
-};
+    try {
+      const updated = await updateCondominio(dados.id, dados);
+      setCondominios((prev) =>
+        prev.map((c) => (c.id === updated.id ? updated : c))
+      );
+      showToast.success("Condomínio atualizado com sucesso!");
+    } catch (err: any) {
+      showToast.error(err.message || "Erro ao atualizar condomínio");
+      throw err;
+    }
+  };
+
+  const abrirCriacao = () => {
+    setModoEdicao(false);
+    setCondominioSelecionado({
+      id: 0,
+      nome_condominio: "",
+      endereco_condominio: "",
+      cidade_condominio: "",
+      uf_condominio: "",
+      tipo_condominio: "",
+    });
+    setDialogOpen(true);
+  };
 
   const abrirEdicao = (condominio: ICondominio) => {
+    setModoEdicao(true);
     setCondominioSelecionado(condominio);
-    setEditOpen(true);
+    setDialogOpen(true);
   };
 
   const validarCondominio = (data: ICondominio): string | null => {
@@ -125,7 +154,13 @@ export default function ListaCondominios() {
 
   return (
     <div className="p-6 max-w-full">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">Condomínios</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Condomínios</h1>
+        <Button onClick={abrirCriacao} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Novo Condomínio
+        </Button>
+      </div>
 
       <div className="mb-6">
         <SearchBar value={filtro} onChange={setFiltro} />
@@ -203,14 +238,14 @@ export default function ListaCondominios() {
         </table>
       </div>
 
-      {/* Dialog de edição - FORA do map, renderizado UMA VEZ */}
+      {/* Dialog único para criar E editar */}
       {condominioSelecionado && (
         <EditDialogBase
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          title="Editar Condomínio"
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          title={modoEdicao ? "Editar Condomínio" : "Novo Condomínio"}
           initialData={condominioSelecionado}
-          onSave={handleUpdate}
+          onSave={modoEdicao ? handleUpdate : handleCreate}
           validate={validarCondominio}
           requireConfirmation={true}
         >
