@@ -4,11 +4,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { LuBuilding2, LuLogOut, LuMenu, LuChevronLeft, LuChevronRight } from "react-icons/lu";
+import { LuBuilding2, LuMenu, LuChevronLeft, LuChevronRight } from "react-icons/lu";
 import { FaHouseUser } from "react-icons/fa";
-import { LiaCitySolid } from "react-icons/lia";
 import { RxExit } from "react-icons/rx";
-import { TbLayoutDashboard } from "react-icons/tb";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,7 +32,7 @@ export default function Menu() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Restaurar estado do sidebar do localStorage
+  // Restaurar estado do sidebar
   useEffect(() => {
     const savedState = localStorage.getItem("sidebarCollapsed");
     if (savedState !== null) setCollapsed(savedState === "true");
@@ -42,7 +40,6 @@ export default function Menu() {
 
   const handleLogout = async () => {
     setLoading(true);
-
     try {
       await supabase.auth.signOut();
       localStorage.clear();
@@ -100,13 +97,23 @@ export default function Menu() {
           ${collapsed && !isMobile ? "w-20" : "w-64"}
         `}
       >
-        {/* Header */}
+        {/* Header da Logo */}
         <div className="relative flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700 min-h-[73px]">
-          <div className={`flex items-center gap-3 transition-all duration-300 ${collapsed && !isMobile ? "opacity-0 w-0 overflow-hidden" : "opacity-100"}`}>
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-              <LiaCitySolid size={50} className="text-white"/>
+          
+          {/* Container da Logo */}
+          <div className={`flex items-center justify-center transition-all duration-300 ${collapsed && !isMobile ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-full"}`}>
+            
+            {/* LOGO COM FUNDO BRANCO */}
+            <div className="w-30 h-20 bg-white rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden shadow-md">
+              <img 
+                src="/logo_viva_condo.png" 
+                alt="Logo Viva Condo" 
+                className="w-full h-full object-contain p-1" 
+              />
             </div>
-            <span className="text-xl font-bold text-white whitespace-nowrap">Viva Condo</span>
+            
+            {/* O TEXTO FOI REMOVIDO DAQUI */}
+
           </div>
 
           {!isMobile && (
